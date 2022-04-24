@@ -4,6 +4,7 @@ import time
 import numpy as np
 import cv2
 import random
+import pdb
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from rpin.utils.config import _C as C
@@ -23,12 +24,14 @@ class PHYREO(Dataset):
         protocal = C.PHYRE_PROTOCAL
         fold = C.PHYRE_FOLD
 
-        num_pos = 400 if split == 'train' else 100
-        num_neg = 1600 if split == 'train' else 400
+        num_pos = 50 if split == 'train' else 400
+        num_neg = 100 if split == 'train' else 1600
 
         eval_setup = f'ball_{protocal}_template'
         train_tasks, dev_tasks, test_tasks = phyre.get_fold(eval_setup, fold)
         tasks = train_tasks + dev_tasks if split == 'train' else test_tasks
+        #TODO:
+        tasks = tasks[: 20]
         action_tier = phyre.eval_setup_to_action_tier(eval_setup)
 
         # all the actions
@@ -55,6 +58,7 @@ class PHYREO(Dataset):
             video_info[:, 0] = t_id
             video_info[:, 1:] = acts
             self.video_info = np.concatenate([self.video_info, video_info])
+        #pdb.set_trace()
 
     def __len__(self):
         return self.video_info.shape[0]

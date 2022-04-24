@@ -1,4 +1,6 @@
 import os
+#import wandb
+import pdb
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -9,15 +11,18 @@ from rpin.utils.bbox import xyxy_to_rois, xyxy_to_posf
 
 
 class Trainer(object):
-    def __init__(self, device, train_loader, val_loader, model, optim,
-                 max_iters, num_gpus, logger, output_dir):
+    def __init__(self, device, train_loader, val_loader,model, optim,
+                 max_iters, num_gpus, logger, output_dir,args):
         # misc
+        self.args=args
         self.device = device
+        self.save_path='./results/'
         self.output_dir = output_dir
         self.logger = logger
         self.num_gpus = num_gpus
         # data loading
-        self.train_loader, self.val_loader = train_loader, val_loader
+        self.train_loader = train_loader
+        self.val_loader = val_loader
         # nn optimization
         self.model = model
         self.optim = optim
@@ -38,16 +43,25 @@ class Trainer(object):
         self.best_mean = 1e6
 
     def train(self):
+        #wandb.init(config=self.args, project="RPIN_test", entity="gtimesformer")
         print_msg = "| ".join(["progress  | mean "] + list(map("{:6}".format, self.loss_name)))
         self.model.train()
         print('\r', end='')
         self.logger.info(print_msg)
-        while self.iterations < self.max_iters:
+        while self.epochs < self.max_iters:
             self.train_epoch()
+            torch.save(self.model.state_dict(), self.save_path + f'pre_{self.epochs + 1}.pt')
             self.epochs += 1
-
+            print(f'epoch{self.epochs}')
+          
     def train_epoch(self):
         for batch_idx, (data, data_t, rois, gt_boxes, gt_masks, valid, g_idx, seq_l) in enumerate(self.train_loader):
+            #print(batch_idx)
+            sum_loss = []
+            sum_seq_loss = []
+            sum_seq_acc = []
+            sum_bbox_loss = []
+            sum_mask_loss = []
             self._adjust_learning_rate()
             data, data_t = data.to(self.device), data_t.to(self.device)
             rois = xyxy_to_rois(rois, batch=data.shape[0], time_step=data.shape[1], num_devices=self.num_gpus)
@@ -60,11 +74,26 @@ class Trainer(object):
                 'valid': valid.to(self.device),
                 'seq_l': seq_l.to(self.device),
             }
-            loss = self.loss(outputs, labels, 'train')
+            loss,bbox_loss,mask_loss,seq_loss = self.loss(outputs, labels, 'train')
+            cpu_loss = loss.cpu().detach().numpy()
+            if (C.RPIN.POSITION_LOSS_WEIGHT):
+                    cpu_bbox_loss = bbox_loss.cpu().detach().numpy()/C.RPIN.POSITION_LOSS_WEIGHT
+                    sum_bbox_loss.append(cpu_bbox_loss)
+            if (C.RPIN.MASK_LOSS_WEIGHT):
+                    cpu_mask_loss = mask_loss.cpu().detach().numpy()/C.RPIN.MASK_LOSS_WEIGHT
+                    sum_mask_loss.append(cpu_mask_loss)
+            if (C.RPIN.SEQ_CLS_LOSS_WEIGHT):
+                    cpu_seq_loss = seq_loss.cpu().detach().numpy()/C.RPIN.SEQ_CLS_LOSS_WEIGHT
+                    acc = ((outputs['score'] > 0.5) == labels['seq_l']).sum() / self.batch_size
+                    acc= acc.cpu().detach().numpy()
+                    sum_seq_loss.append(cpu_seq_loss)
+                    sum_seq_acc.append(acc)
+            sum_loss.append(cpu_loss)
             loss.backward()
             self.optim.step()
             # this is an approximation for printing; the dataset size may not divide the batch size
             self.iterations += self.batch_size
+            #print(self.iterations)
 
             print_msg = ""
             print_msg += f"{self.epochs:03}/{self.iterations // 1000:04}k"
@@ -74,12 +103,12 @@ class Trainer(object):
             print_msg += f" | ".join(
                 ["{:.3f}".format(self.losses[name] * 1e3 / self.loss_cnt) for name in self.loss_name])
             if C.RPIN.SEQ_CLS_LOSS_WEIGHT:
-                print_msg += f" | {self.fg_correct / self.fg_num:.3f} | {self.bg_correct / self.bg_num:.3f}"
+                print_msg += f" | {self.fg_correct / (self.fg_num+ 1e-9):.3f} | {self.bg_correct / (self.bg_num + 1e-9):.3f}"
             speed = self.loss_cnt / (timer() - self.time)
             eta = (self.max_iters - self.iterations) / speed / 3600
             print_msg += f" | speed: {speed:.1f} | eta: {eta:.2f} h"
             print_msg += (" " * (os.get_terminal_size().columns - len(print_msg) - 10))
-            tprint(print_msg)
+            #tprint(print_msg)
 
             if self.iterations % self.val_interval == 0:
                 self.snapshot()
@@ -91,7 +120,27 @@ class Trainer(object):
                 print('\r', end='')
                 print(f'{self.best_mean:.3f}')
                 break
-
+        
+        if(len(sum_mask_loss)):
+            mean_mask_loss = np.mean(sum_mask_loss)
+        if(len(sum_seq_loss)):
+            mean_seq_loss = np.mean(sum_seq_loss)
+        if(len(sum_bbox_loss)):
+            mean_bbox_loss = np.mean(sum_bbox_loss)
+        if(len(sum_seq_acc)):
+            mean_seq_acc = np.mean(sum_seq_acc)
+        mean_cpu_loss = np.mean(sum_loss)
+        pr=f'epoch{self.epochs}  mean_cpu_loss:{mean_cpu_loss}  mean_mask_loss:{mean_mask_loss}  mean_seq_loss:{mean_seq_loss}  mean_bbox_loss:{mean_bbox_loss}  mean_seq_acc:{mean_seq_acc}'
+        self.logger.info(pr)
+        # wandb.log({"epoch loss": mean_cpu_loss})
+        # if (C.RPIN.MASK_LOSS_WEIGHT):
+        #     wandb.log({"epoch mask loss": mean_mask_loss})
+        # if (C.RPIN.SEQ_CLS_LOSS_WEIGHT):
+        #     wandb.log({"epoch seq loss": mean_seq_loss})
+        #     wandb.log({"epoch seq acc": mean_seq_acc})
+        # if (C.RPIN.POSITION_LOSS_WEIGHT):
+        #     wandb.log({"epoch bbox loss": mean_bbox_loss})
+            
     def val(self):
         self.model.eval()
         self._init_loss()
@@ -172,7 +221,7 @@ class Trainer(object):
         loss = loss * valid
         loss = loss.sum(2) / valid.sum(2)
         loss *= self.position_loss_weight
-
+        bbox_loss=loss
         for i in range(pred_size):
             self.box_p_step_losses[i] += loss[:, i, :2].sum().item()
             self.box_s_step_losses[i] += loss[:, i, 2:].sum().item()
@@ -210,6 +259,7 @@ class Trainer(object):
 
         seq_loss = 0
         if C.RPIN.SEQ_CLS_LOSS_WEIGHT > 0:
+            labels['seq_l'] = labels['seq_l'].reshape(-1)
             seq_loss = F.binary_cross_entropy(outputs['score'], labels['seq_l'], reduction='none')
             self.losses['seq'] += seq_loss.sum().item()
             seq_loss = seq_loss.mean() * C.RPIN.SEQ_CLS_LOSS_WEIGHT
@@ -238,7 +288,7 @@ class Trainer(object):
         loss = ((loss * tau) / tau.sum(axis=0, keepdims=True)).sum()
         loss = loss + mask_loss + kl_loss + seq_loss
 
-        return loss
+        return loss,bbox_loss,mask_loss,seq_loss
 
     def snapshot(self, name='ckpt_latest.path.tar'):
         torch.save(

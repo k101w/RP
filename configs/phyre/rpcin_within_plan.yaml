@@ -1,5 +1,5 @@
 OUTPUT_DIR: ./outputs/phys
-DATA_ROOT: 'data/planning/'
+DATA_ROOT: 'data/PHYRE_1fps_p100n400'
 DATASET_ABS: 'PHYREO'  # online version of PHYRE data loader
 PHYRE_PROTOCAL: 'within'
 PHYRE_FOLD: 0
@@ -31,7 +31,7 @@ RPIN:
   HORIZONTAL_FLIP: True
   VERTICAL_FLIP: False
   # loss weight
-  POSITION_LOSS_WEIGHT: 1
+  POSITION_LOSS_WEIGHT: 1.0
   # ----- RoIPooling Setting
   ROI_POOL_SIZE: 5
   ROI_POOL_SAMPLE_R: 2

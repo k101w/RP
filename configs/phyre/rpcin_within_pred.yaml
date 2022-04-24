@@ -1,6 +1,6 @@
 OUTPUT_DIR: ./outputs/phys
 DATA_ROOT: 'data/PHYRE_1fps_p100n400/'
-DATASET_ABS: 'PHYRE'
+DATASET_ABS: 'PHYREO'
 PHYRE_PROTOCAL: 'within'
 PHYRE_FOLD: 0
 SOLVER:
@@ -31,12 +31,12 @@ RPIN:
   HORIZONTAL_FLIP: True
   VERTICAL_FLIP: False
   # loss weight
-  POSITION_LOSS_WEIGHT: 1
+  POSITION_LOSS_WEIGHT: 0.01
   # ----- RoIPooling Setting
   ROI_POOL_SIZE: 5
   ROI_POOL_SAMPLE_R: 2
   # ----- mask prediction
-  MASK_LOSS_WEIGHT: 0.003
+  MASK_LOSS_WEIGHT: 0.06
   MASK_SIZE: 21
   # ----- Architecture
   N_EXTRA_ROI_F: 2
@@ -48,3 +48,57 @@ RPIN:
   EXTRA_F_KERNEL: 3
   EXTRA_F_PADDING: 1
   IMAGE_EXT: '.npy'
+
+
+# OUTPUT_DIR: ./outputs/phys
+# DATA_ROOT: 'data/predicting/'
+# DATASET_ABS: 'PHYREO'
+# PHYRE_PROTOCAL: 'within'
+# PHYRE_FOLD: 0
+# SOLVER:
+#   BASE_LR: 2.0e-4  # single GPU LR
+#   WEIGHT_DECAY: 3.0e-7
+#   SCHEDULER: 'cosine'
+#   MAX_ITERS: 50  #800*20=16000
+#   VAL_INTERVAL: 16001
+#   WARMUP_ITERS: 10000
+#   BATCH_SIZE: 16 # single GPU Batch Size #40
+# INPUT:
+#   PRELOAD_TO_MEMORY: False
+#   IMAGE_CHANNEL: 3
+# RPIN:
+#   BACKBONE: 'hourglass_bn'
+#   ARCH: 'rpcin'
+#   VE_FEAT_DIM: 256
+#   IN_FEAT_DIM: 256
+#   # prediction setting:
+#   INPUT_SIZE: 1
+#   PRED_SIZE_TRAIN: 10
+#   PRED_SIZE_TEST: 10
+#   # input setting:
+#   INPUT_HEIGHT: 128
+#   INPUT_WIDTH: 128
+#   MAX_NUM_OBJS: 6
+#   # data augmentation
+#   HORIZONTAL_FLIP: True
+#   VERTICAL_FLIP: False
+#   # loss weight
+#   POSITION_LOSS_WEIGHT: 0.01
+#   # ----- RoIPooling Setting
+#   ROI_POOL_SIZE: 5
+#   ROI_POOL_SAMPLE_R: 2
+#   # ----- mask prediction
+#   MASK_LOSS_WEIGHT: 0.06
+#   POSITION_LOSS_WEIGHT: 1
+#   SEQ_CLS_LOSS_WEIGHT: 0.03
+#   MASK_SIZE: 21
+#   # ----- Architecture
+#   N_EXTRA_ROI_F: 2
+#   N_EXTRA_PRED_F: 0
+#   N_EXTRA_SELFD_F: 0
+#   N_EXTRA_RELD_F: 0
+#   N_EXTRA_AFFECTOR_F: 0
+#   N_EXTRA_AGGREGATOR_F: 0
+#   EXTRA_F_KERNEL: 3
+#   EXTRA_F_PADDING: 1
+#   IMAGE_EXT: '.npy'

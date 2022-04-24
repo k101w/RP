@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.ops.roi_align import RoIAlign
-
+import pdb
 from rpin.utils.config import _C as C
 from rpin.models.layers.CIN import InterNet
 from rpin.models.backbones.build import build_backbone
@@ -108,6 +108,7 @@ class Net(nn.Module):
         seq_score = []
         if C.RPIN.SEQ_CLS_LOSS_WEIGHT > 0:
             # (p_l * b, o, feat, psz, psz)
+            #pdb.set_trace()
             state_list_buffer = torch.cat([state_list_buffer[pid] for pid in self.picked_state_list])
             # (p_l, b, o, feat)
             seq_feature = self.seq_feature(state_list_buffer.reshape(

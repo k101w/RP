@@ -11,6 +11,7 @@ from rpin.utils.config import _C as cfg
 from rpin.utils.logger import setup_logger, git_diff_config
 from rpin.models import *
 from rpin.trainer import Trainer
+import pdb
 
 
 def arg_parse():
@@ -43,6 +44,7 @@ def main():
         torch.backends.cudnn.deterministic = True
         torch.cuda.manual_seed(0)
         num_gpus = torch.cuda.device_count()
+
     else:
         assert NotImplementedError
 
@@ -92,10 +94,11 @@ def main():
     train_loader = torch.utils.data.DataLoader(
         train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, **kwargs,
     )
+    #pdb.set_trace()
     val_loader = torch.utils.data.DataLoader(
         val_set, batch_size=1 if cfg.RPIN.VAE else cfg.SOLVER.BATCH_SIZE, shuffle=False, **kwargs,
     )
-    print(f'size: train {len(train_loader)} / test {len(val_loader)}')
+    print(f'size: train {len(train_loader)} val {len(val_loader)} ')
 
     # ---- setup trainer
     kwargs = {'device': torch.device('cuda'),
@@ -106,7 +109,8 @@ def main():
               'output_dir': output_dir,
               'logger': logger,
               'num_gpus': num_gpus,
-              'max_iters': cfg.SOLVER.MAX_ITERS}
+              'max_iters': cfg.SOLVER.MAX_ITERS,
+              'args':args}
     trainer = Trainer(**kwargs)
 
     try:
